@@ -19,7 +19,7 @@ import { TerminalManager } from '@jupyterlab/services';
 import { Terminal } from '@jupyterlab/terminal';
 
 async function main(): Promise<void> {
-  const dock = new DockPanel();
+  const dock = new DockPanel({addButtonEnabled:true});
   dock.id = 'main';
 
   // Attach the widget to the dom.
@@ -31,17 +31,37 @@ async function main(): Promise<void> {
   });
 
   const manager = new TerminalManager();
-  const s1 = await manager.startNew();
-  const term1 = new Terminal(s1, { theme: 'light' });
-  term1.title.closable = true;
-  dock.addWidget(term1);
+  await manager.refreshRunning()
+  var terminals = 0
+  var iter = manager.running()
+  var model = iter.next()
+  while(model) {
+    const s = await manager.connectTo({model})
+    const term = new Terminal(s, { theme: 'dark' });
+    if (terminals == 0) {
+      term.title.closable = false;
+    } else {
+      term.title.closable = true;
+    }
+    dock.addWidget(term);
+    terminals += 1
+    model = iter.next()
+  }
 
-  const s2 = await manager.startNew();
-  const term2 = new Terminal(s2, { theme: 'dark' });
-  term2.title.closable = true;
-  dock.addWidget(term2, { mode: 'tab-before' });
+  if (terminals == 0) {
+    const s1 = await manager.startNew();
+    const term1 = new Terminal(s1, { theme: 'dark' });
+    term1.title.closable = false;
+    dock.addWidget(term1);
+  }
 
-  console.debug('Example started!');
+  dock.addRequested.connect(async (sender: DockPanel, arg: any) =>  {
+    // Get the ref for the current tab of the tabbar which the add button was clicked
+    const s1 = await manager.startNew();
+    const term1 = new Terminal(s1, { theme: 'dark' });
+    term1.title.closable = true;
+    dock.addWidget(term1);
+  });
 }
 
 window.addEventListener('load', main);
